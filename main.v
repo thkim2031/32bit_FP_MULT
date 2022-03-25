@@ -21,18 +21,8 @@
 
 
 module main(A,B,rnd,clk,rst,result);
-  parameter WIDTH=32;
-  parameter EXP_WIDTH=8;
-  parameter SIG_WIDTH=23;
-  parameter BIAS=127;
-  
-  parameter CLA_GRP_WIDTH=4;
-  parameter N_CLA_GROUPS=2;
-  
-  parameter code_NaN=32'b0_11111111_1000_0000_0000_0000_0000_000;
-  parameter code_PINF=32'b0_11111111_0000_0000_0000_0000_0000_000;
-  parameter code_NINF=32'b1_11111111_0000_0000_0000_0000_0000_000;
-//`include "parameters.v"
+
+`include "parameters.v"
 
 input [WIDTH-1:0] A,B;
 input [1:0] rnd;
@@ -60,7 +50,7 @@ reg [2*SIG_WIDTH+1:0] mult_result;
 reg [EXP_WIDTH-1:0] exp_tem;
 reg sign_value;
 
-always@(posedge clk)begin
+always@(*)begin
 sign_value = aSign^bSign;
 
 exp_tem = aExp + bExp - BIAS;
@@ -69,28 +59,14 @@ mult_result = {1'b1,aSig} * {1'b1,bSig};
 
 end
 
+//rounding and normalization
+wire exp_increment;
+wire [SIG_WIDTH:0] rounded;
+normal_round normal_rounding0(mult_result,exp_increment, rounded);
 
-
-//normalize
-wire shift_amount, exp_increment;
-assign shift_amount = (mult_result[2*SIG_WIDTH+1])?1'b1:1'b0;
-assign exp_increment = shift_amount;
-
-wire [SIG_WIDTH*2+1:0] normalized;
-assign normalized = mult_result >> shift_amount;
-
-
-//rounding
-wire L,G,T; 
-wire [SIG_WIDTH:0] rounded ;
-
-assign L = normalized[SIG_WIDTH];
-assign G = normalized[SIG_WIDTH-1];
-assign T = |normalized[SIG_WIDTH-2:0];
-
-assign rounded = (G&(T|L))?normalized[SIG_WIDTH*2:SIG_WIDTH]+1'b1:normalized[SIG_WIDTH*2:SIG_WIDTH]+1'b0;
-
-
+//exponent value adjust
+wire [EXP_WIDTH-1:0] exp_value;
+exp_adjust exp_adjust0(exp_tem, exp_increment, exp_value);
 
 
 //final value///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,8 +75,6 @@ wire [WIDTH-1:0] result_pre;
 assign result_pre[WIDTH-1] = sign_value;
 
 //exponent value
-wire [EXP_WIDTH-1:0] exp_value;
-assign exp_value = exp_tem + exp_increment;
 assign result_pre[WIDTH-2:WIDTH-1-EXP_WIDTH] = exp_value;
 
 //sig value
